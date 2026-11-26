@@ -1,3 +1,5 @@
+<img src=".claude-plugin/icon.png" alt="diablo-orbs icon: a red and a blue glass orb" width="128">
+
 # diablo-orbs
 
 A Diablo II-style status line for the Claude Code terminal, built as a Claude Code mod.
