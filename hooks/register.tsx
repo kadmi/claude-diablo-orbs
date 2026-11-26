@@ -20,6 +20,11 @@ const LABEL = '#f4ecd8'
 const MAX_ROWS = 5
 const MIN_COLUMNS_ORBS = 48
 const MIN_COLUMNS_FIGURES = 100
+// A terminal column is about 0.9 as wide as a half-row is tall, so a 5-row orb is 11 columns wide.
+const COLUMN_WIDTH = 0.9
+const COVERAGE_SAMPLES = 6
+// Indexed by quadrant bits: 1 top-left, 2 top-right, 4 bottom-left, 8 bottom-right.
+const QUADRANT_GLYPHS = [' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█']
 
 // The statues flanking the orbs: the angel holds the life orb, the demon the mana orb.
 // Each mask marks per character: g gold, p pale stone, r ember red, anything else plain stone.
@@ -129,24 +134,71 @@ function parseAnsi(source: string): Span[][] {
   })
 }
 
-// The orb is a circle on a grid of half-rows: each terminal cell holds two
-// vertically stacked "pixels" drawn with ▀/▄, which makes them roughly square.
+function mix(colours: readonly string[]): string {
+  const first = colours[0] ?? GLASS.body
+  if (colours.every(colour => colour === first)) return first
+
+  const total = [0, 0, 0]
+  for (const colour of colours) {
+    const n = parseInt(colour.slice(1), 16)
+    total[0] = (total[0] ?? 0) + ((n >> 16) & 255)
+    total[1] = (total[1] ?? 0) + ((n >> 8) & 255)
+    total[2] = (total[2] ?? 0) + (n & 255)
+  }
+
+  return `#${total.map(sum => hex(Math.round(sum / colours.length))).join('')}`
+}
+
+// A cell is four quadrant "pixels": full cells keep two colours with ▀, edge
+// cells draw only their covered quadrants so the rim steps half a column at a time.
+function cellFor(quadrants: readonly (string | undefined)[]): Span {
+  const [topLeft, topRight, bottomLeft, bottomRight] = quadrants
+  const mask = quadrants.reduce((bits, colour, i) => (colour ? bits | (1 << i) : bits), 0)
+  if (mask === 0) return { text: ' ' }
+
+  if (topLeft && topRight && bottomLeft && bottomRight) {
+    const top = mix([topLeft, topRight])
+    const bottom = mix([bottomLeft, bottomRight])
+    return top === bottom ? { text: '█', fg: top } : { text: '▀', fg: top, bg: bottom }
+  }
+
+  const covered = quadrants.filter((colour): colour is string => colour !== undefined)
+  return { text: QUADRANT_GLYPHS[mask] ?? ' ', fg: mix(covered) }
+}
+
+// The orb is a circle measured in half-row heights, sampled per quadrant. A
+// quadrant belongs to the orb when the circle covers at least half of it.
 function orbSpans(rows: number, fill: number | null, palette: Palette, caption: string): Span[][] {
-  const columns = rows * 2
   const halfRows = rows * 2
-  const radius = rows + 0.35
-  const centerX = columns / 2
-  const centerY = halfRows / 2
+  const columns = Math.round(halfRows / COLUMN_WIDTH)
+  const radius = rows - 0.05
+  const centerX = (columns * COLUMN_WIDTH) / 2
+  const centerY = rows
   const shineX = centerX - radius * 0.38
   const shineY = centerY - radius * 0.42
   const surface = halfRows - Math.round(((fill ?? 100) / 100) * halfRows)
+  const quadrantX = (qx: number, offset: number) => ((qx + offset) * COLUMN_WIDTH) / 2
 
-  const pixel = (x: number, y: number): string | undefined => {
-    const distance = Math.hypot(x + 0.5 - centerX, y + 0.5 - centerY)
-    if (distance > radius) return undefined
+  const covers = (qx: number, qy: number) => {
+    let hits = 0
+    for (let sx = 0; sx < COVERAGE_SAMPLES; sx++) {
+      for (let sy = 0; sy < COVERAGE_SAMPLES; sy++) {
+        const x = quadrantX(qx, (sx + 0.5) / COVERAGE_SAMPLES)
+        const y = qy + (sy + 0.5) / COVERAGE_SAMPLES
+        if (Math.hypot(x - centerX, y - centerY) <= radius) hits += 1
+      }
+    }
+    return hits * 2 >= COVERAGE_SAMPLES * COVERAGE_SAMPLES
+  }
 
-    const tone = y >= surface ? palette : GLASS
-    if (Math.hypot(x + 0.5 - shineX, y + 0.5 - shineY) < radius * 0.26) return tone.shine
+  const quadrant = (qx: number, qy: number): string | undefined => {
+    if (!covers(qx, qy)) return undefined
+
+    const x = quadrantX(qx, 0.5)
+    const y = qy + 0.5
+    const distance = Math.hypot(x - centerX, y - centerY)
+    const tone = qy >= surface ? palette : GLASS
+    if (Math.hypot(x - shineX, y - shineY) < radius * 0.26) return tone.shine
     if (distance > radius - 1.1) return tone.rim
     if (distance < radius * 0.5) return tone.core
 
@@ -156,14 +208,15 @@ function orbSpans(rows: number, fill: number | null, palette: Palette, caption: 
   const grid: Span[][] = []
   for (let row = 0; row < rows; row++) {
     const line: Span[] = []
-    for (let x = 0; x < columns; x++) {
-      const top = pixel(x, row * 2)
-      const bottom = pixel(x, row * 2 + 1)
-      if (!top && !bottom) line.push({ text: ' ' })
-      else if (top === bottom) line.push({ text: '█', fg: top })
-      else if (!top) line.push({ text: '▄', fg: bottom })
-      else if (!bottom) line.push({ text: '▀', fg: top })
-      else line.push({ text: '▀', fg: top, bg: bottom })
+    for (let col = 0; col < columns; col++) {
+      line.push(
+        cellFor([
+          quadrant(col * 2, row * 2),
+          quadrant(col * 2 + 1, row * 2),
+          quadrant(col * 2, row * 2 + 1),
+          quadrant(col * 2 + 1, row * 2 + 1),
+        ]),
+      )
     }
     grid.push(line)
   }
