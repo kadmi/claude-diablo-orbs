@@ -1,0 +1,6 @@
+{
+  "name": "claude-diablo-orbs",
+  "owner": { "name": "kadmi" },
+  "description": "Diablo II-style life and mana orbs for the Claude Code status line",
+  "plugins": [{ "name": "diablo-orbs", "source": "./" }]
+}

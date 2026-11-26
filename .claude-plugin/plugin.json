@@ -1,0 +1,11 @@
+{
+  "name": "diablo-orbs",
+  "version": "0.1.0",
+  "description": "Diablo II-style status line: a red life orb for context left, a blue mana orb for rate-limit left, your status line in between",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "kadmi"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/kadmi/claude-diablo-orbs"
+}
