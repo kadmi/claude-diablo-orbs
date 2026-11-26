@@ -4,13 +4,7 @@
 
 A Diablo II-style status line for the Claude Code terminal, built as a Claude Code mod.
 
-```
- _.-.  _    ▄████▄  ▐  [your status line, e.g. claude-hud]  ▌  ▄████▄   \/  .-._
-/ /\ \(_)  ████████ ▐                                       ▌ ████████ (oo)/ /\ \
-| | \_/|\_███ 72% ██▐                                       ▌███ 37% ██_/|\_/ | |
-\ \ \ / \  ███ctx██ ▐                                       ▌ ███5h███  / \ / / /
- `-'/___\   ▀████▀  ▐                                       ▌  ▀████▀  /___\`-'
-```
+![diablo-orbs in a Claude Code terminal: a red life orb held by an angel, claude-hud in the middle, a blue mana orb held by a demon](docs/screenshot.jpg)
 
 - **Red life orb (left, held by a stone angel):** context window left. It drains as the conversation fills the context and refills after compaction.
 - **Blue mana orb (right, held by a stone demon):** rate limit left in the 5-hour window, or the 7-day window when that is the only reading. It shows as grey glass when there is no subscription rate-limit data.
